@@ -5,20 +5,11 @@ import numpy as np
 import re
 
 app = FastAPI(title="API Modelo Legibilidade ISC")
-import joblib
-import numpy as np
-import re
-
-app = FastAPI(title="API Modelo Legibilidade ISC")
 
 artefato = joblib.load("modelo_completo_isc.pkl")
 modelo = artefato["modelo_regressao"]
-features_esperadas = artefato["features_esperadas"]
-descricao = artefato["descricao"]
-artefato = joblib.load("modelo_completo_isc.pkl")
-modelo = artefato["modelo_regressao"]
-features_esperadas = artefato["features_esperadas"]
-descricao = artefato["descricao"]
+features_esperadas = artefato.get("features_esperadas", [])
+descricao = artefato.get("descricao", "Modelo ISC")
 
 
 class CodeRequest(BaseModel):
@@ -27,7 +18,6 @@ class CodeRequest(BaseModel):
 
 
 def extrair_features_basicas(code: str):
-    # P_parametros: estimativa de quantidade de parâmetros em métodos
     assinaturas = re.findall(r"\(([^)]*)\)", code)
     p_parametros = 0
 
@@ -36,7 +26,6 @@ def extrair_features_basicas(code: str):
         if assinatura:
             p_parametros += len([p for p in assinatura.split(",") if p.strip()])
 
-    # C_complexos: estruturas de controle
     c_complexos = (
         code.count("if")
         + code.count("for")
@@ -45,17 +34,14 @@ def extrair_features_basicas(code: str):
         + code.count("catch")
     )
 
-    # B_booleanos: operadores booleanos
     b_booleanos = code.count("&&") + code.count("||") + code.count("!")
 
-    # FD_desordem: proxy simples de desordem por TODO, println e linhas grandes
     fd_desordem = (
         code.count("TODO")
         + code.count("System.out.println")
         + sum(1 for line in code.splitlines() if len(line) > 100)
     )
 
-    # PN_nomes_curtos: nomes muito curtos de variáveis
     nomes_variaveis = re.findall(
         r"\b(?:int|double|float|String|boolean|char|long)\s+([a-zA-Z_][a-zA-Z0-9_]*)",
         code
@@ -84,20 +70,17 @@ def classificar_codigo_isc(features: dict):
     nota_1_a_5 = float(modelo.predict(x_novo)[0])
     nota_1_a_5 = max(1.0, min(5.0, nota_1_a_5))
 
-    pontuacao_sobrecarga = (5.0 - nota_1_a_5) * 5.0
+    score_0_a_10 = nota_1_a_5 * 2
 
-    if pontuacao_sobrecarga <= 7.0:
-        status = "Boa (Baixa Sobrecarga)"
-    elif pontuacao_sobrecarga <= 15.0:
-        status = "Média Sobrecarga"
+    if score_0_a_10 >= 7:
+        status = "Boa legibilidade"
+    elif score_0_a_10 >= 5:
+        status = "Legibilidade média"
     else:
-        status = "Alta Sobrecarga"
-
-    score_legibilidade_0_a_20 = 20 - pontuacao_sobrecarga
+        status = "Baixa legibilidade"
 
     return {
-        "score": round(score_legibilidade_0_a_20, 2),
-        "pontuacao_sobrecarga": round(pontuacao_sobrecarga, 2),
+        "score": round(score_0_a_10, 2),
         "classificacao": status,
         "nota_modelo_1_a_5": round(nota_1_a_5, 2)
     }
@@ -111,18 +94,10 @@ def health_check():
         "descricao": descricao,
         "features_esperadas": features_esperadas
     }
-    return {
-        "status": "ok",
-        "message": "API do modelo ISC está online",
-        "descricao": descricao,
-        "features_esperadas": features_esperadas
-    }
 
 
 @app.post("/analyze")
 def analyze_code(data: CodeRequest):
-    features = extrair_features_basicas(data.content)
-    resultado = classificar_codigo_isc(features)
     features = extrair_features_basicas(data.content)
     resultado = classificar_codigo_isc(features)
 
@@ -132,12 +107,5 @@ def analyze_code(data: CodeRequest):
         "label": resultado["classificacao"],
         "warnings": [],
         "features": features,
-        "pontuacao_sobrecarga": resultado["pontuacao_sobrecarga"],
-        "nota_modelo_1_a_5": resultado["nota_modelo_1_a_5"]
-        "score": resultado["score"],
-        "label": resultado["classificacao"],
-        "warnings": [],
-        "features": features,
-        "pontuacao_sobrecarga": resultado["pontuacao_sobrecarga"],
         "nota_modelo_1_a_5": resultado["nota_modelo_1_a_5"]
     }
