@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import Optional, Dict
 import joblib
 import numpy as np
-import re
 
 app = FastAPI(title="API Modelo Legibilidade ISC")
 
@@ -14,48 +14,7 @@ descricao = artefato.get("descricao", "Modelo ISC")
 
 class CodeRequest(BaseModel):
     filename: str
-    content: str
-
-
-def extrair_features_basicas(code: str):
-    assinaturas = re.findall(r"\(([^)]*)\)", code)
-    p_parametros = 0
-
-    for assinatura in assinaturas:
-        assinatura = assinatura.strip()
-        if assinatura:
-            p_parametros += len([p for p in assinatura.split(",") if p.strip()])
-
-    c_complexos = (
-        code.count("if")
-        + code.count("for")
-        + code.count("while")
-        + code.count("switch")
-        + code.count("catch")
-    )
-
-    b_booleanos = code.count("&&") + code.count("||") + code.count("!")
-
-    fd_desordem = (
-        code.count("TODO")
-        + code.count("System.out.println")
-        + sum(1 for line in code.splitlines() if len(line) > 100)
-    )
-
-    nomes_variaveis = re.findall(
-        r"\b(?:int|double|float|String|boolean|char|long)\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-        code
-    )
-
-    pn_nomes_curtos = sum(1 for nome in nomes_variaveis if len(nome) <= 2)
-
-    return {
-        "P_parametros": p_parametros,
-        "C_complexos": c_complexos,
-        "B_booleanos": b_booleanos,
-        "FD_desordem": fd_desordem,
-        "PN_nomes_curtos": pn_nomes_curtos
-    }
+    features: Dict[str, float]
 
 
 def classificar_codigo_isc(features: dict):
@@ -70,6 +29,7 @@ def classificar_codigo_isc(features: dict):
     nota_1_a_5 = max(1.0, min(5.0, float(modelo.predict(x_novo)[0])))
 
     pontuacao_sobrecarga = (5.0 - nota_1_a_5) * 5.0
+    score_0_a_10 = nota_1_a_5 * 2
 
     if pontuacao_sobrecarga <= 7.0:
         status = "Boa (Baixa Sobrecarga)"
@@ -77,8 +37,6 @@ def classificar_codigo_isc(features: dict):
         status = "Média Sobrecarga"
     else:
         status = "Alta Sobrecarga"
-
-    score_0_a_10 = nota_1_a_5 * 2
 
     return {
         "score": round(score_0_a_10, 2),
@@ -100,15 +58,14 @@ def health_check():
 
 @app.post("/analyze")
 def analyze_code(data: CodeRequest):
-    features = extrair_features_basicas(data.content)
-    resultado = classificar_codigo_isc(features)
+    resultado = classificar_codigo_isc(data.features)
 
     return {
         "filename": data.filename,
         "score": resultado["score"],
         "label": resultado["classificacao"],
         "warnings": [],
-        "features": features,
+        "features": data.features,
         "pontuacao_sobrecarga": resultado["pontuacao_sobrecarga"],
         "nota_modelo_1_a_5": resultado["nota_modelo_1_a_5"]
     }
