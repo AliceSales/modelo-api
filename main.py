@@ -78,7 +78,7 @@ def classificar_codigo_isc(features: dict):
     else:
         status = "Alta Sobrecarga"
 
-    score_0_a_10 = nota_1_a_5 * 2
+    score_0_a_10 = nota_1_a_5 * 2.0
 
     return {
         "score": round(score_0_a_10, 2),
@@ -86,7 +86,6 @@ def classificar_codigo_isc(features: dict):
         "classificacao": status,
         "nota_modelo_1_a_5": round(nota_1_a_5, 2)
     }
-
 
 @app.get("/")
 def health_check():
