@@ -5,7 +5,16 @@ import numpy as np
 import re
 
 app = FastAPI(title="API Modelo Legibilidade ISC")
+import joblib
+import numpy as np
+import re
 
+app = FastAPI(title="API Modelo Legibilidade ISC")
+
+artefato = joblib.load("modelo_completo_isc.pkl")
+modelo = artefato["modelo_regressao"]
+features_esperadas = artefato["features_esperadas"]
+descricao = artefato["descricao"]
 artefato = joblib.load("modelo_completo_isc.pkl")
 modelo = artefato["modelo_regressao"]
 features_esperadas = artefato["features_esperadas"]
@@ -102,15 +111,29 @@ def health_check():
         "descricao": descricao,
         "features_esperadas": features_esperadas
     }
+    return {
+        "status": "ok",
+        "message": "API do modelo ISC está online",
+        "descricao": descricao,
+        "features_esperadas": features_esperadas
+    }
 
 
 @app.post("/analyze")
 def analyze_code(data: CodeRequest):
     features = extrair_features_basicas(data.content)
     resultado = classificar_codigo_isc(features)
+    features = extrair_features_basicas(data.content)
+    resultado = classificar_codigo_isc(features)
 
     return {
         "filename": data.filename,
+        "score": resultado["score"],
+        "label": resultado["classificacao"],
+        "warnings": [],
+        "features": features,
+        "pontuacao_sobrecarga": resultado["pontuacao_sobrecarga"],
+        "nota_modelo_1_a_5": resultado["nota_modelo_1_a_5"]
         "score": resultado["score"],
         "label": resultado["classificacao"],
         "warnings": [],
