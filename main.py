@@ -45,7 +45,6 @@ def classificar_codigo_isc(features: dict):
         "nota_modelo_1_a_5": round(nota_1_a_5, 2)
     }
 
-
 @app.get("/")
 def health_check():
     return {
