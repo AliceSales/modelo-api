@@ -67,20 +67,22 @@ def classificar_codigo_isc(features: dict):
         features["PN_nomes_curtos"]
     ]])
 
-    nota_1_a_5 = float(modelo.predict(x_novo)[0])
-    nota_1_a_5 = max(1.0, min(5.0, nota_1_a_5))
+    nota_1_a_5 = max(1.0, min(5.0, float(modelo.predict(x_novo)[0])))
+
+    pontuacao_sobrecarga = (5.0 - nota_1_a_5) * 5.0
+
+    if pontuacao_sobrecarga <= 7.0:
+        status = "Boa (Baixa Sobrecarga)"
+    elif pontuacao_sobrecarga <= 15.0:
+        status = "Média Sobrecarga"
+    else:
+        status = "Alta Sobrecarga"
 
     score_0_a_10 = nota_1_a_5 * 2
 
-    if score_0_a_10 >= 7:
-        status = "Boa legibilidade"
-    elif score_0_a_10 >= 5:
-        status = "Legibilidade média"
-    else:
-        status = "Baixa legibilidade"
-
     return {
         "score": round(score_0_a_10, 2),
+        "pontuacao_sobrecarga": round(pontuacao_sobrecarga, 2),
         "classificacao": status,
         "nota_modelo_1_a_5": round(nota_1_a_5, 2)
     }
@@ -107,5 +109,6 @@ def analyze_code(data: CodeRequest):
         "label": resultado["classificacao"],
         "warnings": [],
         "features": features,
+        "pontuacao_sobrecarga": resultado["pontuacao_sobrecarga"],
         "nota_modelo_1_a_5": resultado["nota_modelo_1_a_5"]
     }
